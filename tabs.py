@@ -1,30 +1,34 @@
 import gradio as gr
 from loguru import logger
 import sys
-# This works great but it shares a comon global variable shared among multiple users
+# Now it works!
 # Configure loguru to output to console
 logger.remove()
 logger.add(sys.stderr, format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>")
 
-# Global variable to track current tab
-current_tab = "Tab 1"
-
 def on_tab_change(evt: gr.SelectData):
-    """Callback function when tab changes"""
-    global current_tab
+    """Callback function when tab changes - uses session state"""
     if isinstance(evt, gr.SelectData):
         # Get the selected tab name from the event
         tab_index = evt.index
         tab_names = ["Tab 1", "Tab 2", "Tab 3"]
         if 0 <= tab_index < len(tab_names):
-            current_tab = tab_names[tab_index]
-            logger.info(f"Tab changed to {current_tab}")
+            # Store in session state instead of global variable
+            return tab_names[tab_index]
+    return "Tab 1"  # Default fallback
 
-def show_selected_tab():
+def show_selected_tab(current_tab):
     """Button click handler to display current tab"""
     return f"Currently selected tab: {current_tab}"
 
+def update_tab_display():
+    """Update the tab display based on session state"""
+    return "Click the button to see the current tab..."
+
 with gr.Blocks(title="Multi-Tab Application") as demo:
+    # Use session state to track current tab per user
+    current_tab = gr.State(value="Tab 1")
+    
     gr.Markdown("# Multi-Tab Application")
     
     # Create tabs - force Tab 1 to be visible by making it active
@@ -44,8 +48,12 @@ with gr.Blocks(title="Multi-Tab Application") as demo:
             gr.Dropdown(choices=["Option A", "Option B", "Option C"], label="Select Option")
             gr.Slider(0, 100, label="Slider")
     
-    # Add tab change event after creating all tabs
-    tabs.select(on_tab_change, inputs=None, outputs=None)
+    # Add tab change event - updates the session state
+    tabs.select(
+        fn=on_tab_change,
+        inputs=None,
+        outputs=current_tab
+    )
     
     # Output text and button outside tabs
     gr.Markdown("---")
@@ -55,9 +63,12 @@ with gr.Blocks(title="Multi-Tab Application") as demo:
         interactive=False
     )
     show_tab_btn = gr.Button("Show Selected Tab", variant="primary")
-    show_tab_btn.click(show_selected_tab, inputs=None, outputs=output_text)
+    show_tab_btn.click(
+        fn=show_selected_tab,
+        inputs=current_tab,
+        outputs=output_text
+    )
 
 if __name__ == "__main__":
-    # Log initial tab
-    logger.info(f"Application started. Initial tab: {current_tab}")
+    logger.info("Application started with session-based tab tracking")
     demo.launch()
